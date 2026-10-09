@@ -1,0 +1,12 @@
+{% extends 'examples/base.html' %}
+
+{% block title %}Авто-колонки — django-jqwidgets{% endblock %}
+
+{% block content %}
+<h2>Авто-колонки</h2>
+<p class="lead">Колонки строятся из сериализатора <code>ProductSerializer</code> по эндпоинту <code>&lt;source&gt;config/</code>.</p>
+
+<div class="card">
+	{{ grid }}
+</div>
+{% endblock %}

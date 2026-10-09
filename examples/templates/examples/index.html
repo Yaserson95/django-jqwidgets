@@ -1,0 +1,25 @@
+{% extends 'examples/base.html' %}
+
+{% block content %}
+<h2>Примеры виджетов</h2>
+<p class="lead">Демонстрации django-jqwidgets на тестовых данных приложения <code>examples</code>.</p>
+
+<div class="examples-index">
+	<a class="example-link" href="{% url 'examples:auto_columns' %}">
+		<strong>Авто-колонки</strong>
+		<span>Колонки определяются из модели: скрытые поля, фильтры, чекбокс, вложенная категория, форматы дат.</span>
+	</a>
+	<a class="example-link" href="{% url 'examples:explicit_columns' %}">
+		<strong>Колонки и группы</strong>
+		<span>Явные <code>columns</code>/<code>columnsgroups</code>, заданные в подклассе <code>Grid</code>.</span>
+	</a>
+	<a class="example-link" href="{% url 'examples:custom_options' %}">
+		<strong>Опции грида</strong>
+		<span>Кастомные опции jqxGrid: пагинация, фильтр-строка, altrows, размеры колонок.</span>
+	</a>
+	<a class="example-link" href="{% url 'examples:combined' %}">
+		<strong>Два грида</strong>
+		<span>Два <code>&lt;jqx-grid&gt;</code> на одной странице — ассеты загружаются однократно.</span>
+	</a>
+</div>
+{% endblock %}

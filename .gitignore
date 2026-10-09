@@ -1,0 +1,17 @@
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+db.sqlite3
+staticfiles/
+.env
+.angular/
+frontend/dist/
+
+# Сборка пакета (pyproject.toml)
+build/
+dist/
+*.egg-info/
+
+# Легаси-пример: не участвует ни в пакете, ни в демо (12 МБ старых сборок)
+old_example/

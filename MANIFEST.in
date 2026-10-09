@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include jqxwidgets/static *
+recursive-include jqxwidgets/templates *
+recursive-include docs *.md
+# Демо-приложение и фронтенд-исходники живут в репозитории, но не в sdist:
+# пакету они не нужны, а node_modules/ — тем более.
+prune frontend
+prune old_example

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{% block title %}django-jqwidgets — примеры{% endblock %}</title>
+	<style>
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+			background: #f5f6f8;
+			color: #1f2430;
+		}
+		header {
+			background: #1f2430;
+			color: #fff;
+			padding: 14px 24px;
+			display: flex;
+			align-items: baseline;
+			gap: 24px;
+			flex-wrap: wrap;
+		}
+		header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+		header nav { display: flex; gap: 16px; flex-wrap: wrap; }
+		header nav a {
+			color: #b9c0cc;
+			text-decoration: none;
+			font-size: 14px;
+			padding-bottom: 2px;
+			border-bottom: 2px solid transparent;
+		}
+		header nav a:hover { color: #fff; }
+		header nav a.active { color: #fff; border-bottom-color: #4c8dff; }
+		main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+		h2 { font-size: 20px; margin: 0 0 4px; }
+		p.lead { margin: 0 0 16px; color: #5c6470; font-size: 14px; }
+		.card {
+			background: #fff;
+			border: 1px solid #e2e5ea;
+			border-radius: 8px;
+			padding: 16px;
+			margin-bottom: 24px;
+		}
+		.examples-index { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+		.example-link {
+			display: block;
+			background: #fff;
+			border: 1px solid #e2e5ea;
+			border-radius: 8px;
+			padding: 16px;
+			text-decoration: none;
+			color: inherit;
+			transition: border-color .15s, box-shadow .15s;
+		}
+		.example-link:hover { border-color: #4c8dff; box-shadow: 0 2px 8px rgba(76,141,255,.15); }
+		.example-link strong { display: block; margin-bottom: 6px; color: #4c8dff; }
+		.example-link span { font-size: 13px; color: #5c6470; }
+		footer { padding: 16px 24px; color: #8a919d; font-size: 13px; text-align: center; }
+	</style>
+	{% block extra_css %}{% endblock %}
+</head>
+<body>
+	<header>
+		<h1>django-jqwidgets</h1>
+		<nav>
+			{% url 'examples:index' as idx %}
+			<a href="{{ idx }}" class="{% if request.path == idx %}active{% endif %}">Примеры</a>
+			<a href="{% url 'examples:auto_columns' %}" class="{% if request.resolver_match.url_name == 'auto_columns' %}active{% endif %}">Авто-колонки</a>
+			<a href="{% url 'examples:explicit_columns' %}" class="{% if request.resolver_match.url_name == 'explicit_columns' %}active{% endif %}">Колонки и группы</a>
+			<a href="{% url 'examples:custom_options' %}" class="{% if request.resolver_match.url_name == 'custom_options' %}active{% endif %}">Опции грида</a>
+			<a href="{% url 'examples:combined' %}" class="{% if request.resolver_match.url_name == 'combined' %}active{% endif %}">Два грида</a>
+		</nav>
+	</header>
+
+	<main>
+		{% block content %}{% endblock %}
+	</main>
+
+	<footer>&copy; django-jqwidgets — демо виджетов</footer>
+	{% block extra_js %}{% endblock %}
+</body>
+</html>

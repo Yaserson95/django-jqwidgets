@@ -1,0 +1,18 @@
+{% extends 'examples/base.html' %}
+
+{% block title %}Два грида — django-jqwidgets{% endblock %}
+
+{% block content %}
+<h2>Два грида на одной странице</h2>
+<p class="lead">Проверка: ассеты (CSS/JS бандла) внедряются однократно, оба компонента инициализируются.</p>
+
+<div class="card">
+	<h2 style="font-size:16px;margin-bottom:12px;">Товары</h2>
+	{{ product_grid }}
+</div>
+
+<div class="card">
+	<h2 style="font-size:16px;margin-bottom:12px;">Категории</h2>
+	{{ category_grid }}
+</div>
+{% endblock %}

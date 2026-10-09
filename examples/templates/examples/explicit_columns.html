@@ -1,0 +1,12 @@
+{% extends 'examples/base.html' %}
+
+{% block title %}Колонки и группы — django-jqwidgets{% endblock %}
+
+{% block content %}
+<h2>Колонки и группы колонок</h2>
+<p class="lead">Явные <code>columns</code> и <code>columnsgroups</code> заданы в подклассе <code>CategoryGrid</code>.</p>
+
+<div class="card">
+	{{ grid }}
+</div>
+{% endblock %}

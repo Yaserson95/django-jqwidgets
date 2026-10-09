@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "django-jqxwidgets"
+dynamic = ["version"]
+description = "Server-driven jQWidgets data grid for Django: DRF viewsets + <jqx-grid> web component."
+readme = "README.md"
+requires-python = ">=3.10"
+# PEP 639: SPDX-выражение + файлы лицензий (нужен setuptools>=77)
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "YASER", email = "yaroskoresh@gmail.com" }]
+keywords = [
+    "django",
+    "jqwidgets",
+    "jqxgrid",
+    "datagrid",
+    "djangorestframework",
+    "web-component",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "Django>=4.2",
+    "djangorestframework>=3.14",
+    "django-filter>=23.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Yaserson95/django-jqxwidgets"
+Repository = "https://github.com/Yaserson95/django-jqxwidgets"
+Documentation = "https://github.com/Yaserson95/django-jqxwidgets/tree/main/docs"
+Issues = "https://github.com/Yaserson95/django-jqxwidgets/issues"
+
+[tool.setuptools]
+# Демо-проект (config/, examples/) — НЕ входит в пакет, только jqxwidgets.
+# static/ и templates/ — namespace-пакеты: объявляем их явно, иначе setuptools
+# ругается, что data-каталоги "распознаются как importable, но не объявлены".
+packages = [
+    "jqxwidgets",
+    "jqxwidgets.static",
+    "jqxwidgets.static.jqxwidgets",
+    "jqxwidgets.static.jqxwidgets.media",
+    "jqxwidgets.templates",
+    "jqxwidgets.templates.jqxwidgets",
+]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = { attr = "jqxwidgets.__version__" }
+
+# Собранный Angular-бандл + шаблоны обязаны попасть и в wheel, и в sdist.
+# Паттерны явные (без **), чтобы работать со старыми версиями setuptools.
+[tool.setuptools.package-data]
+"jqxwidgets.static.jqxwidgets" = ["*"]
+"jqxwidgets.static.jqxwidgets.media" = ["*"]
+"jqxwidgets.templates.jqxwidgets" = ["*"]
