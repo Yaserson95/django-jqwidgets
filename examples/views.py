@@ -1,12 +1,15 @@
 from django.shortcuts import render
 
-from jqxwidgets import Grid, GridViewSet
+from jqxwidgets import Grid, GridViewSet, Tree, TreeViewSet
 
 from .serializers import ProductSerializer
 
 # Источники данных для гридов (регистрация viewset'ов в ростере jqxwidgets)
 PRODUCT_SOURCE = GridViewSet.create('Product', serializer_class=ProductSerializer)
 CATEGORY_SOURCE = GridViewSet.create('Category')
+
+# Источник данных для дерева: REST-уровни + конфигурация jqxTree
+NODE_SOURCE = TreeViewSet.create('Node', chunk_size=50)
 
 
 class CategoryGrid(Grid):
@@ -22,7 +25,7 @@ class CategoryGrid(Grid):
         {'text': 'Основное', 'name': 'main', 'align': 'center'},
         {'text': 'Дополнительное', 'name': 'extra', 'align': 'center'},
     ]
-    options = {'columnsresize': True, 'pageable': False}
+    options = {'columnsresize': True, 'pageable': False, "theme":"material"}
 
 
 class ProductOptionsGrid(Grid):
@@ -37,6 +40,7 @@ class ProductOptionsGrid(Grid):
         'showfilterrow': True,
         'selectionmode': 'singlecell',
         'altrows': True,
+        "theme":"material"
     }
 
 
@@ -76,3 +80,11 @@ def combined(request):
         'category_grid': CategoryGrid(source=CATEGORY_SOURCE),
     }
     return render(request, 'examples/combined.html', context)
+
+
+def tree(request):
+    """jqxTree: дети узла грузятся при раскрытии, чанки — по мере долистывания."""
+    context = {
+        'tree': Tree(source=NODE_SOURCE, height=400),
+    }
+    return render(request, 'examples/tree.html', context)

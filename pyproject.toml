@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "django-jqxwidgets"
 dynamic = ["version"]
-description = "Server-driven jQWidgets data grid for Django: DRF viewsets + <jqx-grid> web component."
+description = "Server-driven jQWidgets data grid and lazy-loading tree for Django: DRF viewsets + <jqx-grid>/<jqx-tree> web components."
 readme = "README.md"
 requires-python = ">=3.10"
 # PEP 639: SPDX-выражение + файлы лицензий (нужен setuptools>=77)
@@ -17,6 +17,8 @@ keywords = [
     "jqwidgets",
     "jqxgrid",
     "datagrid",
+    "jqxtree",
+    "tree",
     "djangorestframework",
     "web-component",
 ]

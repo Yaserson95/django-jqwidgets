@@ -31,3 +31,21 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Node(models.Model):
+    """Узел древовидной структуры (самоссылка) для примера jqxTree."""
+    name = models.CharField(max_length=255, verbose_name='Название')
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, related_name='children',
+        on_delete=models.CASCADE, verbose_name='Родитель',
+    )
+    priority = models.IntegerField(default=0, verbose_name='Приоритет')
+
+    class Meta:
+        verbose_name = 'Узел дерева'
+        verbose_name_plural = 'Узлы дерева'
+        ordering = ['priority', 'name']
+
+    def __str__(self):
+        return self.name

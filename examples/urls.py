@@ -10,4 +10,5 @@ urlpatterns = [
     path('explicit-columns/', views.explicit_columns, name='explicit_columns'),
     path('custom-options/', views.custom_options, name='custom_options'),
     path('combined/', views.combined, name='combined'),
+    path('tree/', views.tree, name='tree'),
 ]

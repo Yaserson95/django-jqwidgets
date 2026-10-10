@@ -2,16 +2,19 @@
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
-Server-driven **jQWidgets** data grid for Django. The package ships two halves:
+Server-driven **jQWidgets** data grid and tree for Django. The package ships
+two halves:
 
 * a Django/DRF backend (`jqxwidgets`) that turns any model into a JSON endpoint
-  with paging, filtering, sorting and an auto-generated column config;
-* a prebuilt Angular Elements bundle that renders the `<jqx-grid>` web component
-  (no Node.js is required at runtime — the bundle is committed under
-  `jqxwidgets/static/jqxwidgets/`).
+  with paging, filtering, sorting and an auto-generated column config — plus a
+  lazy-loading tree endpoint;
+* a prebuilt Angular Elements bundle that renders the `<jqx-grid>` and
+  `<jqx-tree>` web components (no Node.js is required at runtime — the bundle is
+  committed under `jqxwidgets/static/jqxwidgets/`).
 
-You write a model, register a viewset, drop `{{ my_grid }}` into a template —
-and get a fully server-side paginated grid with filters and multi-column sorting.
+You write a model, register a viewset, drop `{{ my_grid }}` (or `{{ my_tree }}`)
+into a template — and get a fully server-side paginated grid with filters and
+multi-column sorting, or a tree that loads its nodes on expand and on scroll.
 
 ---
 
@@ -25,6 +28,10 @@ and get a fully server-side paginated grid with filters and multi-column sorting
 * **Server-side everything** — paging (`pagenum`/`pagesize`), multi-column
   sorting (`sorting`), grouped filtering (`filterGroups`); both parameters are
   sent as url-safe Base64, plain JSON is accepted for backward compatibility.
+* **Lazy tree** — `TreeViewSet.create("Node")` + `Tree(source=…)`: roots load on
+  page load, children on branch expand (`?parent=<id>`), and large levels stream
+  in chunks while scrolling (`?offset=&limit=`); `haschildren` is computed
+  server-side so the expand arrow appears before children are fetched.
 * **Nested data** — nested serializers are flattened into `category__name`
   style keys that jqxGrid understands natively.
 * **One bundle per page** — assets are injected once, guarded against double
@@ -43,7 +50,7 @@ pip install git+https://github.com/Yaserson95/django-jqxwidgets.git
 Pin a tag/commit for reproducible deployments:
 
 ```bash
-pip install "django-jqxwidgets @ git+https://github.com/Yaserson95/django-jqxwidgets.git@v0.1.0"
+pip install "django-jqxwidgets @ git+https://github.com/Yaserson95/django-jqxwidgets.git@v0.2.0"
 ```
 
 Minimal setup:
@@ -95,7 +102,8 @@ Full walkthrough, options and the request protocol:
 ## Run the demo project (this repository)
 
 The repository itself is a ready-to-run Django project: the `jqxwidgets` package
-plus an `examples` app with four demo pages and 120 seeded products.
+plus an `examples` app with five demo pages and seeded data (120 products,
+742 tree nodes).
 
 ### 1. Prerequisites
 
@@ -126,6 +134,7 @@ the package itself is not needed here.
 ```bash
 python manage.py migrate
 python manage.py seed_examples          # 6 categories + 120 products (deterministic)
+python manage.py seed_tree              # 742 nodes: 20 roots, a 300-node level, deep branches
 # python manage.py seed_examples --clear --products 500   # re-seed
 ```
 
@@ -146,9 +155,11 @@ Open <http://127.0.0.1:8000/>:
 | `/explicit-columns/` | explicit columns and column groups (subclass of `Grid`) |
 | `/custom-options/` | explicit jqxGrid options (`pagesize`, `showfilterrow`, …) |
 | `/combined/` | two grids on one page (bundle loads exactly once) |
+| `/tree/` | lazy tree: children on expand, chunks on scroll (300-node level) |
 | `/admin/` | Django admin (seeded data) |
 | `/api/product/`, `/api/product/config/` | the JSON endpoints behind the grids |
 | `/api/category/`, `/api/category/config/` | same for categories |
+| `/api/node/`, `/api/node/config/` | the JSON endpoints behind the tree |
 
 ---
 
@@ -171,14 +182,25 @@ with the source change.
 
 ## Tests
 
-Smoke test (pages, REST endpoints, paging, Base64 sorting/filtering, legacy
-compat) — run from the repository root:
+Smoke test (pages, REST endpoints, paging, Base64 sorting/filtering, tree
+protocol, legacy compat) — run from the repository root:
 
 ```bash
 python -m examples.tests.smoke
 ```
 
 Expected output: a list of `[OK]` lines ending with `ALL PASSED`.
+
+Frontend tests (optional; they need jsdom — `npm install --no-save jsdom` in
+`frontend/` — plus a running demo server for the e2e test):
+
+```bash
+cd frontend
+npm install --no-save jsdom
+node scripts/test-tree-jsdom.mjs                       # jqxTree API contract (jsdom)
+python manage.py runserver 127.0.0.1:8765              # in another terminal, repo root
+node scripts/test-tree-e2e.mjs                         # full page: load → expand → scroll chunks
+```
 
 ---
 
@@ -187,13 +209,14 @@ Expected output: a list of `[OK]` lines ending with `ALL PASSED`.
 ```
 jqxwidgets/            # the installable Django app (the package on PyPI/GitHub)
   static/jqxwidgets/   #   built web component bundle + manifest.json
-  templates/jqxwidgets/#   <jqx-grid> template
-  viewsets.py          #   GridViewSet: filters, sorting, config endpoint
+  templates/jqxwidgets/#   <jqx-grid> and <jqx-tree> templates
+  viewsets.py          #   GridViewSet + TreeViewSet: filters, sorting, config endpoints
   grid.py              #   Grid / GridConfig widgets
+  tree.py              #   Tree widget (lazy loading)
   ...
-frontend/              # Angular sources for the web component (npm run build)
+frontend/              # Angular sources for the web components (npm run build)
 docs/                  # installation, usage and API reference
-examples/              # demo Django app (models, views, pages, seed command)
+examples/              # demo Django app (models, views, pages, seed commands)
 config/                # demo project settings / urls
 pyproject.toml         # packaging (pip install git+...)
 examples/tests/smoke.py# smoke test

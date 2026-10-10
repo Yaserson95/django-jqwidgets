@@ -8,6 +8,7 @@ otherwise:
 ```python
 from jqxwidgets import Grid, GridViewSet
 from jqxwidgets import GridConfig
+from jqxwidgets import Tree, TreeViewSet
 ```
 
 ---
@@ -77,6 +78,46 @@ GridConfig(columns=None, columnsgroups=None, **options)
 
 ---
 
+## `Tree`
+
+*class* `jqxwidgets.tree.Tree` — the tree widget with lazy loading. Renders as
+`{{ tree }}`.
+
+### Constructor
+
+```python
+Tree(source=None, config=None, **options)
+```
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `source` | viewset class / viewset instance / `str` | data endpoint; strings are used as-is, viewsets are resolved to their URL |
+| `config` | `dict \| None` | jqxTree options merged over the class attributes |
+| `**options` | any | any jqxTree option (`height`, `checkboxes`, `width`, …); wins over `config` and class attributes |
+
+### Class attributes (override them in a subclass)
+
+| Attribute | Default | Description |
+| --- | --- | --- |
+| `source` | `None` | default source for instances |
+| `options` | `{}` | default jqxTree options |
+
+```python
+class DepartmentTree(Tree):
+    options = {'height': 500, 'checkboxes': True}
+```
+
+### Members
+
+| Member | Description |
+| --- | --- |
+| `url` *(property)* | resolved URL of the tree endpoint (raises `ImproperlyConfigured` when the source cannot be resolved) |
+| `config` | the resulting options dict (after merging) |
+| `__html__()` | renders `jqxwidgets/tree.html` with `source`, `config` (JSON), `assets` (styles + loader) |
+| `__str__()` | same as `__html__()` |
+
+---
+
 ## `GridViewSet`
 
 *class* `jqxwidgets.viewsets.GridViewSet(rest_framework.viewsets.ModelViewSet)` —
@@ -141,6 +182,46 @@ Optional keys: `columnsgroups` (from `Meta.grid_columnsgroups`).
 
 ---
 
+## `TreeViewSet`
+
+*class* `jqxwidgets.viewsets.TreeViewSet(rest_framework.viewsets.ViewSet)` —
+the tree data backend (roots + lazy children + chunked loading). Use the
+factory.
+
+### `TreeViewSet.create(model, name=None, *, queryset=None, label_field=None, parent_field='parent', chunk_size=50, max_chunk_size=500, extra=None, **attrs)` → `type`
+
+| Argument | Description |
+| --- | --- |
+| `model` | model class, `"MyModel"` or `"app_label.MyModel"` |
+| `name` | URL prefix; defaults to the model name (lowercased) |
+| `queryset` | custom queryset (default `model.objects.all()`); its ordering controls node order |
+| `label_field` | node label field; default — auto-detected (`name` / `title` / `label` / `str(obj)`) |
+| `parent_field` | self-FK (or integer) field pointing to the parent; validated at creation |
+| `chunk_size` | nodes returned per request by default (default `50`) |
+| `max_chunk_size` | upper clamp for the client `limit` (default `500`) |
+| `extra` | dict merged into the `<prefix>/config/` response (any jqxTree option) |
+| `**attrs` | any ViewSet attribute: `permission_classes`, `authentication_classes`, … |
+
+Behaviour:
+
+* **cached per model**, registered in the package router (basename attribute
+  `tree_basename`);
+* basename deduplication is shared with `GridViewSet.create()`;
+* `haschildren` is computed with an `Exists` subquery (no extra queries).
+
+### Instance members
+
+| Member | Description |
+| --- | --- |
+| `label_field` / `parent_field` / `chunk_size` / `max_chunk_size` | class-level configuration (see above) |
+| `list(request, …)` | `GET <prefix>/` (roots) / `?parent=<id>` (children) / `?offset=&limit=` (chunks) → `{count, results}` with `{id, label, parentid, haschildren}` |
+| `tree_config` *(action)* | `GET <prefix>/config/` → `{pk, labelField, parentField, chunkSize}` + `extra` |
+
+Malformed `offset`/`limit` fall back to defaults; an unknown `parent` returns
+`200` with an empty `results` list.
+
+---
+
 ## `GridPagination`
 
 *class* `jqxwidgets.pagination.GridPagination(rest_framework.pagination.PageNumberPagination)`
@@ -166,7 +247,8 @@ The default page size comes from `REST_FRAMEWORK['PAGE_SIZE']`.
 | `build_serializer(model)` | auto-generated `ModelSerializer` subclass with `fields = '__all__'` |
 | `default_filterset_fields(model)` | dict of `filterset_fields` from model fields (with type-dependent lookups) |
 | `decode_json_param(value)` | url-safe Base64 → JSON text; raw JSON (starting with `{`/`[`) is passed through (backward compatibility); padding optional |
-| `source_url(source)` | viewset class/instance/string → URL; raises `ImproperlyConfigured` if it cannot be reversed |
+| `source_url(source, basename_attr='grid_basename', widget='Grid')` | viewset class/instance/string → URL; `basename_attr` selects the route attribute (`'grid_basename'` for grids, `'tree_basename'` for trees); raises `ImproperlyConfigured` if it cannot be reversed |
+| `default_label_field(model)` | auto-detected label field: the first of `name`, `title`, `label`; `None` when none exists (`str(obj)` is used) |
 | `CONDITION_MAP` | mapping `condition → ORM lookup` (see [usage.md](usage.md) §5.2) |
 | `FIELD_FILTERS` | field types → extra lookups used by `default_filterset_fields` |
 
@@ -203,7 +285,7 @@ Serializer `Meta` hooks read by `build_grid_config`:
 
 | Object | Description |
 | --- | --- |
-| `router` | the package-level `rest_framework.routers.SimpleRouter` used by `create()` |
+| `router` | the package-level `rest_framework.routers.SimpleRouter` used by both factories; basenames are deduplicated across `GridViewSet` and `TreeViewSet` registrations |
 | `jqxwidgets.urls` | exposes `router.urls`; application namespace `jqxwidgets` (`reverse('jqxwidgets:<basename>-list')`) |
 
 ---
@@ -212,19 +294,22 @@ Serializer `Meta` hooks read by `build_grid_config`:
 
 ```python
 import jqxwidgets
-jqxwidgets.__version__   # '0.1.0'
+jqxwidgets.__version__   # '0.2.0'
 jqxwidgets.Grid          # jqxwidgets.grid.Grid
 jqxwidgets.GridConfig    # jqxwidgets.grid.GridConfig
 jqxwidgets.GridViewSet   # jqxwidgets.viewsets.GridViewSet
+jqxwidgets.Tree          # jqxwidgets.tree.Tree
+jqxwidgets.TreeViewSet   # jqxwidgets.viewsets.TreeViewSet
 ```
 
 ## Exceptions raised to the caller
 
 | Exception | Where | When |
 | --- | --- | --- |
-| `ImproperlyConfigured` | `source_url()` / `Grid.url` | no `source`, or the viewset has no registered URL |
+| `ImproperlyConfigured` | `source_url()` / `Grid.url` / `Tree.url` | no `source`, or the viewset has no registered URL |
 | `LookupError` | `resolve_model()` | model not found / ambiguous name |
-| `TypeError` | `GridConfig.from_value()` | value is neither `dict` nor `GridConfig` |
+| `TypeError` | `GridConfig.from_value()` / `Tree()` | value is neither `dict` nor `GridConfig` (for `Tree(config=…)` — not a `dict`) |
+| `ValueError` | `TreeViewSet.create()` | `parent_field` is not a self-FK / integer field, or `label_field` does not exist |
 | `FieldError` | `apply_jqx_sorting()` | *caught and logged* — invalid sort field |
 
 Malformed query parameters (`sorting`, `filterGroups`) never propagate: they are

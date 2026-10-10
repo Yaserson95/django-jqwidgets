@@ -1,0 +1,16 @@
+{% extends 'examples/base.html' %}
+
+{% block title %}Дерево — django-jqwidgets{% endblock %}
+
+{% block content %}
+<h2>jqxTree с динамической подгрузкой</h2>
+<p class="lead">
+	Дочерние узлы загружаются по REST при раскрытии ветки; если у узла детей
+	много (например, «Большой раздел» — 300 штук), следующие чанки по 50
+	подгружаются при прокрутке списка.
+</p>
+
+<div class="card">
+	{{ tree }}
+</div>
+{% endblock %}

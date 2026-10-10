@@ -23,8 +23,29 @@ rmSync(targetDir, { recursive: true, force: true });
 mkdirSync(targetDir, { recursive: true });
 cpSync(distDir, targetDir, { recursive: true });
 
+// Эмит Angular-сборки — ES-модули (всегда strict-режим). jqx-библиотека
+// написана для classic-скриптов (sloppy-режим): отвязанные вызовы вроде
+// `w(x)` внутри _updatefilterpanel полагаются на `this === window`.
+// В strict-режиме `this === undefined` -> "can't access property 'theme'".
+// Поэтому каждый JS-файл оборачивается в IIFE и грузится как classic script:
+// изоляция var сохраняется (как в модуле), а код выполняется в sloppy-режиме.
+for (const name of readdirSync(targetDir).filter((f) => f.endsWith('.js'))) {
+  const path = join(targetDir, name);
+  const code = readFileSync(path, 'utf8');
+  if (code.startsWith('(function(){')) continue; // уже обёрнут
+  writeFileSync(path, '(function(){\n' + code + '\n})();\n');
+}
+
+// Артефактный index.html ng build ссылается на entry как на type="module".
+// Файлы уже обёрнуты в IIFE и грузятся как classic scripts (см. jqxwidgets/assets.py),
+// поэтому атрибут убираем, чтобы файл оставался самодостаточным для отладки.
+const indexPath = join(targetDir, 'index.html');
+const indexHtml = readFileSync(indexPath, 'utf8')
+  .replace(/<script([^>]*)\s+type="module"([^>]*)>/gi, '<script$1$2>');
+writeFileSync(indexPath, indexHtml);
+
 // Entry-файлы берём из эмитированного index.html (чанки подгружаются сами).
-const html = readFileSync(join(targetDir, 'index.html'), 'utf8');
+const html = readFileSync(indexPath, 'utf8');
 
 const js = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"[^>]*>/gi)]
   .map((m) => m[1].replace(/^\.\//, ''));

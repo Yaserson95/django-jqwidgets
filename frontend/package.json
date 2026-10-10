@@ -1,8 +1,8 @@
 {
   "name": "django-jqwidgets-frontend",
   "private": true,
-  "description": "Angular Elements-бандл django-jqwidgets: веб-компонент <jqx-grid> на jqwidgets-ng.",
-  "version": "0.1.0",
+  "description": "Angular Elements bundle for django-jqxwidgets: <jqx-grid> and <jqx-tree> web components on jqwidgets-ng.",
+  "version": "0.2.0",
   "scripts": {
     "build": "ng build && node scripts/copy-dist.mjs",
     "watch": "ng build --watch --configuration development",

@@ -49,11 +49,14 @@ def assets_html() -> str:
         return mark_safe(links)
 
     sources = json.dumps([static('jqxwidgets/' + name) for name in js])
+    # Скрипты грузятся как classic (не module): бандл обёрнут в IIFE
+    # (см. scripts/copy-dist.mjs), а jqx-код требует sloppy-режима —
+    # в ES-модалях (строгий режим) отвязанные вызовы дают this=undefined.
     loader = (
         '<script>(function(){var w=window;if(w.__JQXWIDGETS_LOADED__){return;}'
         'w.__JQXWIDGETS_LOADED__=true;var f=' + sources + ';var i=0;'
         '(function next(){if(i>=f.length){return;}'
-        'var s=document.createElement("script");s.type="module";s.src=f[i++];'
+        'var s=document.createElement("script");s.src=f[i++];'
         's.onload=next;s.onerror=function(){w.__JQXWIDGETS_LOADED__=false;};'
         'document.head.appendChild(s);})();})();</script>'
     )

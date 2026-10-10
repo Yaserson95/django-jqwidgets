@@ -97,17 +97,18 @@ busting is required.
 
 ```python
 # somewhere in a view or a shell
-from jqxwidgets import Grid, GridViewSet
+from jqxwidgets import Grid, GridViewSet, Tree, TreeViewSet
 ```
 
-Render a page containing `{{ grid }}` (see [usage.md](usage.md)) and check the
-browser dev tools: one `<link rel="stylesheet">` per stylesheet plus a small
-inline loader script that injects `polyfills-*.js` and `main-*.js` exactly once
-per page (`window.__JQXWIDGETS_LOADED__` guard).
+Render a page containing `{{ grid }}` or `{{ tree }}` (see
+[usage.md](usage.md)) and check the browser dev tools: one
+`<link rel="stylesheet">` per stylesheet plus a small inline loader script that
+injects `polyfills-*.js` and `main-*.js` exactly once per page
+(`window.__JQXWIDGETS_LOADED__` guard).
 
-If the page shows `<jqx-grid>` but nothing renders and the console warns about
-`manifest.json`, the static files are missing — reinstall the package or, in a
-source checkout, rebuild the frontend (below).
+If the page shows `<jqx-grid>` / `<jqx-tree>` but nothing renders and the
+console warns about `manifest.json`, the static files are missing — reinstall
+the package or, in a source checkout, rebuild the frontend (below).
 
 ## Upgrading
 
@@ -140,6 +141,6 @@ pip uninstall django-jqxwidgets
 ```
 
 Remove `'jqxwidgets'` from `INSTALLED_APPS`, the `include('jqxwidgets.urls')`
-path, and every `Grid(...)` usage from your views/templates.
+path, and every `Grid(...)` / `Tree(...)` usage from your views/templates.
 
 Next: [usage.md](usage.md) — how to build grids · [classes.md](classes.md) — API reference.

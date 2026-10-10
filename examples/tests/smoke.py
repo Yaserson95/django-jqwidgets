@@ -26,7 +26,7 @@ def check(name, cond, detail=''):
 c = Client()
 
 # --- Страницы примеров ---
-for path in ['/', '/auto-columns/', '/explicit-columns/', '/custom-options/', '/combined/']:
+for path in ['/', '/auto-columns/', '/explicit-columns/', '/custom-options/', '/combined/', '/tree/']:
     r = c.get(path)
     check(f'GET {path}', r.status_code == 200, f'status={r.status_code}')
 
@@ -35,6 +35,11 @@ check('auto-columns содержит <jqx-grid', '<jqx-grid' in html)
 check('auto-columns source=/api/product/', 'source="/api/product/"' in html)
 check('auto-columns имеет ассеты (loader)', '__JQXWIDGETS_LOADED__' in html)
 check('auto-columns config передан', 'config="' in html and 'columns' in html)
+# jqx написан для sloppy-режима: ES-модули (type="module") всегда строгие,
+# и отвязанные вызовы вроде this.theme падают (баг меню фильтров/сортировки).
+# Бандл оборачивается в IIFE (copy-dist.mjs) и грузится как classic script.
+check('loader грузит бандл как classic script (не module)', 'type="module"' not in html,
+      f"найдено type=\"module\": {'module' in html}")
 
 html = c.get('/explicit-columns/').content.decode()
 check('explicit содержит columnsgroups', 'columnsgroups' in html)
@@ -146,6 +151,79 @@ check('filter name contains "Роман" (base64 + UTF-8)', len(res) > 0
 r = c.get('/api/product/', {'filterGroups': 'не-base64!!', 'pagesize': 5})
 check('битый base64 -> 200, без фильтрации', r.status_code == 200
       and r.json().get('count') == 120, f"status={r.status_code}, count={r.json().get('count')}")
+
+# --- jqxTree: страница и разметка ---
+html = c.get('/tree/').content.decode()
+check('tree: страница содержит <jqx-tree', '<jqx-tree' in html)
+check('tree: source=/api/node/', 'source="/api/node/"' in html)
+check('tree: имеет ассеты (loader)', '__JQXWIDGETS_LOADED__' in html)
+
+# --- jqxTree: REST — корневой уровень ---
+r = c.get('/api/node/')
+check('GET /api/node/', r.status_code == 200, f'status={r.status_code}')
+data = r.json()
+# корни: 20 разделов + «Большой» + «Глубокий»
+check('tree list: count корней = 22', data.get('count') == 22, f"count={data.get('count')}")
+first = data['results'][0]
+check('tree list: элемент содержит id/label/parentid/haschildren',
+      set(first) >= {'id', 'label', 'parentid', 'haschildren'}, f"keys={sorted(first)}")
+check('tree list: parentid корней = None', first['parentid'] is None)
+check('tree list: haschildren=true у корней', all(x['haschildren'] for x in data['results']))
+check('tree list: сортировка по имени (Б → Г → Р)',
+      first['label'].startswith('Большой'), f"label={first['label']}")
+
+# --- jqxTree: REST — дети узла и чанки ---
+big = next(x for x in data['results'] if x['label'].startswith('Большой'))
+r = c.get('/api/node/', {'parent': big['id']})
+check('GET /api/node/?parent=<big>', r.status_code == 200, f'status={r.status_code}')
+kids = r.json()
+check('tree parent: count детей Большого раздела = 300', kids.get('count') == 300,
+      f"count={kids.get('count')}")
+check('tree parent: первый чанк = 50 (chunk_size)', len(kids['results']) == 50,
+      f"n={len(kids['results'])}")
+check('tree parent: parentid детей = id Большого', kids['results'][0]['parentid'] == big['id'])
+check('tree parent: листья haschildren=false',
+      all(not x['haschildren'] for x in kids['results']))
+
+r = c.get('/api/node/', {'parent': big['id'], 'offset': 50, 'limit': 50})
+page2 = r.json()['results']
+check('tree offset=50: следующий чанк без повторов',
+      len(page2) == 50 and page2[0]['id'] != kids['results'][0]['id'],
+      f"first={page2[0]['id'] if page2 else None}")
+
+r = c.get('/api/node/', {'parent': big['id'], 'offset': 250})
+last_page = r.json()['results']
+check('tree offset=250: хвост чанка (300-250=50)', len(last_page) == 50, f"n={len(last_page)}")
+
+r = c.get('/api/node/', {'parent': big['id'], 'limit': 9999})
+check('tree limit клампится max_chunk_size (500)', len(r.json()['results']) <= 500,
+      f"n={len(r.json()['results'])}")
+
+# --- jqxTree: REST — глубина и пустые уровни ---
+deep = next(x for x in data['results'] if x['label'].startswith('Глубокий'))
+r = c.get('/api/node/', {'parent': deep['id']})
+check('tree deep: 3 дочерних узла первого уровня', r.json()['count'] == 3,
+      f"count={r.json().get('count')}")
+check('tree deep: у детей есть внуки (haschildren=true)',
+      all(x['haschildren'] for x in r.json()['results']))
+
+r = c.get('/api/node/', {'parent': 'не-id!!'})
+check('tree: битый parent -> 200, пустой уровень',
+      r.status_code == 200 and r.json() == {'count': 0, 'results': []},
+      f"status={r.status_code}, body={r.json()}")
+
+r = c.get('/api/node/', {'parent': 999999})
+check('tree: несуществующий parent -> пустой уровень', r.json()['count'] == 0,
+      f"count={r.json().get('count')}")
+
+# --- jqxTree: REST — config ---
+r = c.get('/api/node/config/')
+check('GET /api/node/config/', r.status_code == 200, f'status={r.status_code}')
+cfg = r.json()
+check('tree config: pk/labelField/parentField/chunkSize',
+      cfg.get('pk') == 'id' and cfg.get('labelField') == 'name'
+      and cfg.get('parentField') == 'parent' and cfg.get('chunkSize') == 50,
+      f"cfg={cfg}")
 
 print()
 if failures:
