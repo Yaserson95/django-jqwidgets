@@ -9,13 +9,65 @@ otherwise:
 from jqxwidgets import Grid, GridViewSet
 from jqxwidgets import GridConfig
 from jqxwidgets import Tree, TreeViewSet
+from jqxwidgets import Widget          # base class of all widgets
 ```
+
+---
+
+## `Widget`
+
+*class* `jqxwidgets.widgets.Widget` — the base class every widget inherits
+from (`Grid`, `Tree`, `Form`). It owns everything common: source resolution,
+option merging, the `url` property and template rendering. You normally do
+not subclass it directly — use `Grid` / `Tree` / `Form`.
+
+### Constructor
+
+```python
+Widget(source=None, config=None, **options)
+```
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `source` | viewset class / viewset instance / `str` | data endpoint; falls back to the class attribute |
+| `config` | `dict \| None` | options merged over the class attributes (parsed by the `_extract_config()` hook) |
+| `**options` | any | any jqx option; wins over `config` and class attributes |
+
+Option merge order (later wins): class `options` → `config` → `**options`.
+
+### Class attributes (override them in a subclass)
+
+| Attribute | Default | Description |
+| --- | --- | --- |
+| `source` | `None` | default source for instances |
+| `options` | `{}` | default jqx options |
+| `template_name` | — | template rendered by `__html__()`, e.g. `jqxwidgets/grid.html` |
+| `basename_attr` | `'grid_basename'` | viewset attribute holding the route basename |
+| `widget_name` | `'Grid'` | widget name used in error messages |
+
+### Hooks (override them in a subclass)
+
+| Hook | Description |
+| --- | --- |
+| `_extract_config(config)` | parse `config` into a plain options dict (base: requires a `dict`) |
+| `config_json()` | serialize the configuration for the element's `config` attribute |
+| `get_context()` | template context; base returns `source`, `config` (JSON), `assets` |
+
+### Members
+
+| Member | Description |
+| --- | --- |
+| `source` | the resolved source (class attribute or constructor argument) |
+| `options` | the merged options dict (after class `options` / `config` / `**options`) |
+| `url` *(property)* | resolved URL of the data endpoint (raises `ImproperlyConfigured` when the source cannot be resolved) |
+| `__html__()` | renders `template_name` with the `get_context()` payload |
+| `__str__()` | same as `__html__()` |
 
 ---
 
 ## `Grid`
 
-*class* `jqxwidgets.grid.Grid` — the template widget. Renders as
+*class* `jqxwidgets.widgets.grid.Grid` — the template widget. Renders as
 `{{ grid }}` (implements `__html__`, so it is also auto-escaped correctly).
 
 ### Constructor
@@ -60,8 +112,8 @@ class ProductGrid(Grid):
 
 ## `GridConfig`
 
-*class* `jqxwidgets.grid.GridConfig` — a serializable container for columns,
-groups and options.
+*class* `jqxwidgets.widgets.grid.GridConfig` — a serializable container for
+columns, groups and options.
 
 ```python
 GridConfig(columns=None, columnsgroups=None, **options)
@@ -80,8 +132,8 @@ GridConfig(columns=None, columnsgroups=None, **options)
 
 ## `Tree`
 
-*class* `jqxwidgets.tree.Tree` — the tree widget with lazy loading. Renders as
-`{{ tree }}`.
+*class* `jqxwidgets.widgets.tree.Tree` — the tree widget with lazy loading.
+Renders as `{{ tree }}`.
 
 ### Constructor
 
@@ -115,6 +167,80 @@ class DepartmentTree(Tree):
 | `config` | the resulting options dict (after merging) |
 | `__html__()` | renders `jqxwidgets/tree.html` with `source`, `config` (JSON), `assets` (styles + loader) |
 | `__str__()` | same as `__html__()` |
+
+---
+
+## `Form`
+
+*class* `jqxwidgets.widgets.form.Form` — the form widget (record
+create/edit). Renders as `{{ form }}`.
+
+### Constructor
+
+```python
+Form(source=None, id=None, template=None, buttons=None, form=None, config=None, **options)
+```
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `source` | viewset class / viewset instance / `str` | data endpoint with CRUD + `<source>config/` (usually `FormViewSet`) |
+| `id` | any / `None` | record identifier to edit (`None` — new record) |
+| `template` | `list[dict]` / `None` | explicit jqxForm template rows; wins over `form` |
+| `buttons` | `bool` / `None` | render «Сохранить»/«Отмена» buttons (default `True`) |
+| `form` | Django form class or instance / `None` | template rows are built from the Django form's fields (see `template_from_form`) |
+| `config` | `dict` / `None` | kind keys `template`/`buttons` are absorbed; the rest become jqx options |
+| `**options` | any | any jqxForm option (`width`, `padding` …) |
+
+Template precedence (later wins): class `template` attribute → `form` →
+explicit `template` argument → `config={'template': …}`.
+
+```python
+class CategoryDjangoForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = '__all__'
+
+my_form = Form(source=CATEGORY_FORM, form=CategoryDjangoForm,
+               id=request.GET.get('id'))
+```
+
+### Class attributes (override them in a subclass)
+
+| Attribute | Default | Description |
+| --- | --- | --- |
+| `template` | `None` | default template rows |
+| `buttons` | `True` | render save/cancel buttons |
+
+### Members
+
+| Member | Description |
+| --- | --- |
+| `id` | the record identifier (`None` — new record) |
+| `django_form` | the resolved Django form instance passed via `form=` (`None` if not given) |
+| `template` | the resolved template rows (list of dicts) |
+| `buttons` | whether save/cancel buttons are rendered |
+| `url` *(property)* | resolved URL of the form endpoint (raises `ImproperlyConfigured` when the source cannot be resolved) |
+| `__html__()` | renders `jqxwidgets/form.html` with `source`, `record`, `config` (JSON), `assets` |
+| `__str__()` | same as `__html__()` |
+
+### `template_from_form(form)` → `list[dict]`
+
+*Also* `jqxwidgets.template_from_form` — builds jqxForm template rows from a
+Django form (class or instance of `django.forms.Form` / `ModelForm`):
+
+| Row key | Source |
+| --- | --- |
+| `type` | control type from the field class: `CharField` → `text`, `IntegerField`/`FloatField`/`DecimalField` → `number`, `ChoiceField`/`ModelChoiceField` → `dropdownlist`, `BooleanField` → `boolean`, `DateField` → `date`, `TimeField` → `time`, `DateTimeField` → `datetime`; widgets `PasswordInput` → `password`, `RadioSelect` → `option` |
+| `bind` | field name (REST record keys) |
+| `label` | field label (ModelForms take `verbose_name`) + `form.label_suffix` (default `:`) |
+| `required` | present for required fields |
+| `source` / `options` | choices as `[{'value': …, 'label': …}]` (dropdownlist uses `source`, radio uses `options`); FK lists come from the queryset; optgroups are flattened with a «Group: item» prefix |
+| `info` | `help_text` with HTML stripped |
+
+Fields jqxForm cannot render (files, multi-select) raise
+`ImproperlyConfigured` — exclude them from the form or pass an explicit
+`template`. The generated list can be post-processed before handing it to
+the widget (`rows = template_from_form(Form); rows.append(...)`).
 
 ---
 
@@ -295,20 +421,25 @@ Serializer `Meta` hooks read by `build_grid_config`:
 ```python
 import jqxwidgets
 jqxwidgets.__version__   # '0.2.0'
-jqxwidgets.Grid          # jqxwidgets.grid.Grid
-jqxwidgets.GridConfig    # jqxwidgets.grid.GridConfig
+jqxwidgets.Widget        # jqxwidgets.widgets.Widget (base class)
+jqxwidgets.Grid          # jqxwidgets.widgets.grid.Grid
+jqxwidgets.GridConfig    # jqxwidgets.widgets.grid.GridConfig
 jqxwidgets.GridViewSet   # jqxwidgets.viewsets.GridViewSet
-jqxwidgets.Tree          # jqxwidgets.tree.Tree
+jqxwidgets.Tree          # jqxwidgets.widgets.tree.Tree
 jqxwidgets.TreeViewSet   # jqxwidgets.viewsets.TreeViewSet
+jqxwidgets.Form          # jqxwidgets.widgets.form.Form
+jqxwidgets.FormViewSet   # jqxwidgets.viewsets.FormViewSet
+jqxwidgets.template_from_form  # jqxwidgets.widgets.form.template_from_form
 ```
 
 ## Exceptions raised to the caller
 
 | Exception | Where | When |
 | --- | --- | --- |
-| `ImproperlyConfigured` | `source_url()` / `Grid.url` / `Tree.url` | no `source`, or the viewset has no registered URL |
+| `ImproperlyConfigured` | `source_url()` / `Grid.url` / `Tree.url` / `Form.url` | no `source`, or the viewset has no registered URL |
 | `LookupError` | `resolve_model()` | model not found / ambiguous name |
-| `TypeError` | `GridConfig.from_value()` / `Tree()` | value is neither `dict` nor `GridConfig` (for `Tree(config=…)` — not a `dict`) |
+| `TypeError` | `GridConfig.from_value()` / `Tree()` / `Form()` / `template_from_form()` | value is neither `dict` nor `GridConfig` (for `Tree(config=…)` / `Form(config=…)` — not a `dict`); `template_from_form()` got something that is not a Django form class/instance |
+| `ImproperlyConfigured` | `template_from_form()` | form field jqxForm cannot render (file, multi-select) — exclude it or pass an explicit `template` |
 | `ValueError` | `TreeViewSet.create()` | `parent_field` is not a self-FK / integer field, or `label_field` does not exist |
 | `FieldError` | `apply_jqx_sorting()` | *caught and logged* — invalid sort field |
 

@@ -2,19 +2,21 @@
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
-Server-driven **jQWidgets** data grid and tree for Django. The package ships
-two halves:
+Server-driven **jQWidgets** data grid, tree and record form for Django. The
+package ships two halves:
 
 * a Django/DRF backend (`jqxwidgets`) that turns any model into a JSON endpoint
   with paging, filtering, sorting and an auto-generated column config — plus a
-  lazy-loading tree endpoint;
-* a prebuilt Angular Elements bundle that renders the `<jqx-grid>` and
-  `<jqx-tree>` web components (no Node.js is required at runtime — the bundle is
-  committed under `jqxwidgets/static/jqxwidgets/`).
+  lazy-loading tree endpoint and a CRUD form endpoint;
+* a prebuilt Angular Elements bundle that renders the `<jqx-grid>`,
+  `<jqx-tree>` and `<jqx-form>` web components (no Node.js is required at
+  runtime — the bundle is committed under `jqxwidgets/static/jqxwidgets/`).
 
-You write a model, register a viewset, drop `{{ my_grid }}` (or `{{ my_tree }}`)
-into a template — and get a fully server-side paginated grid with filters and
-multi-column sorting, or a tree that loads its nodes on expand and on scroll.
+You write a model, register a viewset, drop `{{ my_grid }}` (or `{{ my_tree }}`,
+`{{ my_form }}`) into a template — and get a fully server-side paginated grid
+with filters and multi-column sorting, a tree that loads its nodes on expand
+and on scroll, or a record form (even with its fields generated from a Django
+`ModelForm`).
 
 ---
 
@@ -34,6 +36,11 @@ multi-column sorting, or a tree that loads its nodes on expand and on scroll.
   server-side so the expand arrow appears before children are fetched.
 * **Nested data** — nested serializers are flattened into `category__name`
   style keys that jqxGrid understands natively.
+* **Record forms** — `Form(source=FormViewSet.create("Product"), id=…)` renders
+  a `<jqx-form>` with built-in save/cancel buttons and full CRUD; the field
+  template comes from the serializer, your own rows — or straight from a Django
+  `Form`/`ModelForm` via `form=MyDjangoForm` (types, labels, `required`,
+  choices/FK lists, `help_text`).
 * **One bundle per page** — assets are injected once, guarded against double
   loading, and resolved through `manifest.json` (cache-busting hashes).
 
@@ -102,7 +109,7 @@ Full walkthrough, options and the request protocol:
 ## Run the demo project (this repository)
 
 The repository itself is a ready-to-run Django project: the `jqxwidgets` package
-plus an `examples` app with five demo pages and seeded data (120 products,
+plus an `examples` app with seven demo pages and seeded data (120 products,
 742 tree nodes).
 
 ### 1. Prerequisites
@@ -156,10 +163,13 @@ Open <http://127.0.0.1:8000/>:
 | `/custom-options/` | explicit jqxGrid options (`pagesize`, `showfilterrow`, …) |
 | `/combined/` | two grids on one page (bundle loads exactly once) |
 | `/tree/` | lazy tree: children on expand, chunks on scroll (300-node level) |
+| `/form/` | record form: create/edit, built-in buttons, `getForm()` from a grid |
+| `/form-django/` | jqxForm generated from a Django `ModelForm` (`form=`) |
 | `/admin/` | Django admin (seeded data) |
 | `/api/product/`, `/api/product/config/` | the JSON endpoints behind the grids |
 | `/api/category/`, `/api/category/config/` | same for categories |
 | `/api/node/`, `/api/node/config/` | the JSON endpoints behind the tree |
+| `/api/category-form/`, `/api/product-form/` | CRUD + config behind the forms |
 
 ---
 
@@ -209,10 +219,9 @@ node scripts/test-tree-e2e.mjs                         # full page: load → exp
 ```
 jqxwidgets/            # the installable Django app (the package on PyPI/GitHub)
   static/jqxwidgets/   #   built web component bundle + manifest.json
-  templates/jqxwidgets/#   <jqx-grid> and <jqx-tree> templates
-  viewsets.py          #   GridViewSet + TreeViewSet: filters, sorting, config endpoints
-  grid.py              #   Grid / GridConfig widgets
-  tree.py              #   Tree widget (lazy loading)
+  templates/jqxwidgets/#   <jqx-grid>, <jqx-tree> and <jqx-form> templates
+  widgets/             #   Widget base class + Grid / GridConfig / Tree / Form
+  viewsets/            #   BaseViewSet + GridViewSet / TreeViewSet / FormViewSet
   ...
 frontend/              # Angular sources for the web components (npm run build)
 docs/                  # installation, usage and API reference

@@ -1,0 +1,65 @@
+{% extends 'examples/base.html' %}
+
+{% block title %}Форма — django-jqwidgets{% endblock %}
+
+{% block content %}
+<h2>jqxForm: форма записи</h2>
+<p class="lead">
+	Самостоятельная форма из вьюшки:
+	<code>Form(source=CATEGORY_FORM, id=request.GET.get('id'))</code>.
+	Кнопки «Сохранить» (POST/PUT) и «Отмена» встроены в форму по умолчанию.
+	<br>
+	<a href="?id=1">Открыть запись #1</a> ·
+	<a href="?id=3">… #3</a> ·
+	<a href="./">Новая запись</a>
+</p>
+
+<div class="card">
+	{{ form }}
+</div>
+
+<h2>Форма из виджета: getForm()</h2>
+<p class="lead">
+	<code>grid.getForm(id?)</code> возвращает элемент <code>&lt;jqx-form&gt;</code> —
+	его размещает сама страница (здесь: под гридом; можно и в окне).
+	После сохранения грид перечитывает данные автоматически.
+</p>
+
+<div class="card">
+	{{ grid }}
+</div>
+
+<div style="margin: 12px 0; display: flex; gap: 8px; align-items: center;">
+	<button id="btn-form-new">Новая запись (getForm)</button>
+	<button id="btn-form-edit">Редактировать выбранную строку</button>
+	<span id="form-status" style="color: #555;"></span>
+</div>
+<div id="form-slot"></div>
+
+<script>
+(function () {
+	var grid = document.querySelector('jqx-grid');
+	var slot = document.getElementById('form-slot');
+	var status = document.getElementById('form-status');
+
+	function mount(form) {
+		slot.innerHTML = '';
+		slot.appendChild(form);
+		form.addEventListener('saved', function (e) {
+			status.textContent = 'Сохранено: #' + (e.detail && e.detail.id);
+		});
+	}
+
+	document.getElementById('btn-form-new').onclick = function () {
+		status.textContent = '';
+		mount(grid.getForm());
+	};
+	document.getElementById('btn-form-edit').onclick = function () {
+		var row = grid.getSelectedRow();
+		if (!row) { status.textContent = 'Выберите строку в гриде'; return; }
+		status.textContent = '';
+		mount(grid.getForm(row.id));
+	};
+})();
+</script>
+{% endblock %}

@@ -1,21 +1,16 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  EventEmitter,
-  OnDestroy,
-  Output,
-  ViewChild,
-  signal,
-} from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { jqxGridComponent } from 'jqwidgets-ng/jqxgrid';
 
-import { buildGridOptions, configUrl } from './jqx-grid-config';
+import { buildGridOptions } from './jqx-grid-config';
+import { JqxWidgetElement } from './jqx-widget.base';
 
 /**
  * Web-компонент `<jqx-grid>`: Django-шаблон рендерит элемент с атрибутами
  * `source` (URL REST-списка) и `config` (JSON явных опций/колонок),
  * а компонент сам загружает конфигурацию и поднимает jqxGrid.
+ *
+ * Общее с `<jqx-tree>` (CRUD по источнику, source/config, error, lifecycle) —
+ * в базовом классе `JqxWidgetElement`.
  */
 @Component({
   selector: 'jqx-grid',
@@ -48,11 +43,10 @@ import { buildGridOptions, configUrl } from './jqx-grid-config';
     `,
   ],
 })
-export class JqxGridElement implements AfterViewInit, OnDestroy {
-  @ViewChild('inner') inner?: jqxGridComponent;
+export class JqxGridElement extends JqxWidgetElement {
+  protected override readonly widgetName = 'grid';
 
   // События для потребителей элемента (CustomEvent на <jqx-grid>)
-  @Output() created = new EventEmitter<void>();
   @Output() bindingcomplete = new EventEmitter<any>();
   @Output() cellclick = new EventEmitter<any>();
   @Output() celldoubleclick = new EventEmitter<any>();
@@ -70,46 +64,26 @@ export class JqxGridElement implements AfterViewInit, OnDestroy {
   @Output() pagechanged = new EventEmitter<any>();
   @Output() pagesizechanged = new EventEmitter<any>();
 
-  readonly error = signal<string | null>(null);
-  private destroyed = false;
   private reloadTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingState = 'data';
   private adapter: any = null;
 
-  constructor(private readonly hostRef: ElementRef<HTMLElement>) {}
-
-  ngAfterViewInit(): void {
-    this.wireEvents();
-    void this.init();
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed = true;
-    if (this.reloadTimer !== null) {
-      clearTimeout(this.reloadTimer);
-      this.reloadTimer = null;
-    }
-  }
-
-  private async init(): Promise<void> {
+  protected override async init(): Promise<void> {
     const host = this.hostRef.nativeElement;
-    const source = host.getAttribute('source') ?? '';
+    this.source = host.getAttribute('source') ?? '';
     const overrides = this.parseConfig(host.getAttribute('config'));
 
     let definition: any = {};
-    if (source) {
-      try {
-        const response = await fetch(configUrl(source), {
-          headers: { Accept: 'application/json' },
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        definition = await response.json();
-      } catch (err) {
-        console.error('[jqx-grid] не удалось загрузить конфигурацию:', err);
+    if (this.source) {
+      const loaded = await this.loadConfig();
+      if (loaded === null) {
+        // Сбой загрузки конфигурации: без явных колонок грид не поднять.
         if (!overrides.columns) {
           this.error.set('Не удалось загрузить конфигурацию таблицы');
           return;
         }
+      } else {
+        definition = loaded;
       }
     }
 
@@ -118,7 +92,7 @@ export class JqxGridElement implements AfterViewInit, OnDestroy {
     const options = buildGridOptions(
       definition,
       overrides,
-      source,
+      this.source,
       () => this.sortInfo(),
       (state) => this.scheduleReload(state),
     );
@@ -148,15 +122,9 @@ export class JqxGridElement implements AfterViewInit, OnDestroy {
     }, 0);
   }
 
-  private parseConfig(raw: string | null): Record<string, any> {
-    if (!raw) return {};
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (err) {
-      console.error('[jqx-grid] невалидный JSON в атрибуте config:', err);
-      return {};
-    }
+  /** После create/update/delete — адаптер в virtualmode снова запросит страницу. */
+  protected override reloadData(): void {
+    this.scheduleReload('data');
   }
 
   private sortInfo(): any {
@@ -169,7 +137,27 @@ export class JqxGridElement implements AfterViewInit, OnDestroy {
     }
   }
 
-  private wireEvents(): void {
+  /**
+   * Данные выбранной строки (null, если ничего не выбрано).
+   *
+   * `getselectedrowdata` у jqx v27 нет ни в обёртке, ни в виджете —
+   * индекс берём через `getselectedrowindex()`, строку — `getrowdata()`
+   * (в virtualmode он отдаёт данные из dataview по bound-индексу).
+   */
+  getSelectedRow(): any | null {
+    try {
+      const inner = this.inner;
+      const grid: any = inner?.widgetObject;
+      if (!grid) return null;
+      const index = inner.getselectedrowindex?.();
+      if (!Number.isInteger(index) || index < 0) return null;
+      return grid.getrowdata?.(index) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  protected override wireEvents(): void {
     const inner = this.inner;
     if (!inner) return;
     this.relay(inner.onBindingcomplete, this.bindingcomplete);
@@ -196,10 +184,6 @@ export class JqxGridElement implements AfterViewInit, OnDestroy {
     this.relay(inner.onPagesizechanged, this.pagesizechanged);
   }
 
-  private relay(source: EventEmitter<any> | undefined, target: EventEmitter<any>): void {
-    source?.subscribe((value) => target.emit(value));
-  }
-
   /** Привести dataview.totalrecords к count бэкенда и обновить пейджер. */
   private syncPagerTotals(): void {
     try {
@@ -212,6 +196,13 @@ export class JqxGridElement implements AfterViewInit, OnDestroy {
       }
     } catch (err) {
       console.warn('[jqx-grid] не удалось синхронизировать totalrecords:', err);
+    }
+  }
+
+  protected override teardown(): void {
+    if (this.reloadTimer !== null) {
+      clearTimeout(this.reloadTimer);
+      this.reloadTimer = null;
     }
   }
 }

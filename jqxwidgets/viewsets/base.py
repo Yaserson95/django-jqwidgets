@@ -1,4 +1,6 @@
-"""Базовый класс viewset-фабрик jqxWidgets: общее для грида и дерева."""
+"""Базовый класс viewset-фабрик jqxWidgets: общее для грида, дерева и формы."""
+
+from rest_framework.mixins import CreateModelMixin
 
 from ..router import router
 from ..utils import resolve_model
@@ -32,8 +34,11 @@ class BaseViewSet:
 
     # Реестр созданных viewset'ов: '<kind>:<app_label>.<model_name>' -> класс
     _registry: dict = {}
-    # Basename'ы, занятые в общем роутере (гриды и деревья вместе)
+    # Basename'ы, занятые в общем роутере (гриды, деревья и формы вместе)
     _registered_basenames: set = set()
+    # Префиксы URL, занятые в общем роутере: одна модель может иметь грид,
+    # дерево и форму — каждый со своим viewset'ом и URL
+    _registered_prefixes: set = set()
 
     # ------------------------------------------------------------------
     # Реестр
@@ -77,6 +82,11 @@ class BaseViewSet:
             return cls._registry[registry_key]
 
         prefix = name or resolved._meta.model_name
+        # Дедупликация префикса: у одной модели может быть грид, дерево и
+        # форма — каждый со своим viewset'ом (иначе маршруты перекрываются:
+        # первый зарегистрированный «съедает» URL другого).
+        if prefix in cls._registered_prefixes:
+            prefix = f'{prefix}-{cls._kind}'
         basename = resolved._meta.model_name
         # Дедупликация basename'а в общем роутере: гриды и деревья вместе.
         if cls.exists(basename):
@@ -87,14 +97,45 @@ class BaseViewSet:
             (cls,),
             cls._build_options(resolved, queryset=queryset, extra=extra, **attrs),
         )
-        # Атрибуты, по которым Grid/Tree находят URL источника (source_url)
+        # Атрибуты, по которым Grid/Tree/Form находят URL источника (source_url)
         setattr(viewset, f'{cls._kind}_basename', basename)
         setattr(viewset, f'{cls._kind}_model', resolved)
 
         router.register(prefix, viewset, basename=basename)
         cls._registry[registry_key] = viewset
         cls._registered_basenames.add(basename)
+        cls._registered_prefixes.add(prefix)
         return viewset
+
+    # ------------------------------------------------------------------
+    # HTTP-диспетчеры
+    # ------------------------------------------------------------------
+    @classmethod
+    def as_view(cls, actions=None, **initkwargs):
+        """Перебиндить POST: фабрика ``create()`` затеняет действие DRF.
+
+        Роутер видит ``create`` — фабрику создания viewset'а — и биндит на
+        неё POST-диспетчер, из-за чего запрос падал бы с TypeError
+        (``resolve_model(request)``). POST роутится на ``create_object``,
+        если класс миксина ``CreateModelMixin`` входит в его MRO (грид,
+        форма), либо не биндится вовсе — тогда POST на дерева вернёт 405.
+        """
+        if actions and actions.get('post') == 'create':
+            actions = dict(actions)
+            if any(base is CreateModelMixin for base in cls.__mro__):
+                actions['post'] = 'create_object'
+            else:
+                del actions['post']
+        return super().as_view(actions, **initkwargs)
+
+    def create_object(self, request, *args, **kwargs):
+        """POST: создать запись.
+
+        Действие DRF переименовано из ``create``: имя занято фабрикой
+        :meth:`create` (см. :meth:`as_view`). Доступно только классам с
+        ``CreateModelMixin`` (``ModelViewSet``).
+        """
+        return CreateModelMixin.create(self, request, *args, **kwargs)
 
     # ------------------------------------------------------------------
     # Хуки для наследников

@@ -26,7 +26,8 @@ def check(name, cond, detail=''):
 c = Client()
 
 # --- Страницы примеров ---
-for path in ['/', '/auto-columns/', '/explicit-columns/', '/custom-options/', '/combined/', '/tree/']:
+for path in ['/', '/auto-columns/', '/explicit-columns/', '/custom-options/', '/combined/',
+             '/tree/', '/form/', '/form-django/']:
     r = c.get(path)
     check(f'GET {path}', r.status_code == 200, f'status={r.status_code}')
 
@@ -152,6 +153,46 @@ r = c.get('/api/product/', {'filterGroups': 'не-base64!!', 'pagesize': 5})
 check('битый base64 -> 200, без фильтрации', r.status_code == 200
       and r.json().get('count') == 120, f"status={r.status_code}, count={r.json().get('count')}")
 
+# --- CRUD (POST/PUT/PATCH/DELETE) ---
+# Фабрика GridViewSet.create() заняла имя create, поэтому POST роутится на
+# create_object (см. BaseViewSet.as_view).
+r = c.post('/api/category/',
+           {'name': 'SMOKE категория', 'description': 'создана smoke', 'priority': 5},
+           content_type='application/json')
+check('POST /api/category/ -> 201', r.status_code == 201, f'status={r.status_code}')
+created = r.json() if r.status_code == 201 else {}
+cid = created.get('id')
+check('POST: запись создана (name/priority)', bool(cid) and created.get('name') == 'SMOKE категория'
+      and created.get('priority') == 5, f'created={created}')
+
+r = c.get(f'/api/category/{cid}/') if cid else None
+check('GET /api/category/<id/> -> 200',
+      r is not None and r.status_code == 200, f'status={getattr(r, "status_code", None)}')
+
+r = c.put(f'/api/category/{cid}/',
+          {'name': 'SMOKE категория PUT', 'description': 'y', 'priority': 6},
+          content_type='application/json') if cid else None
+check('PUT -> 200 и имя обновлено', r is not None and r.status_code == 200
+      and r.json().get('name') == 'SMOKE категория PUT',
+      f'status={getattr(r, "status_code", None)}')
+
+r = c.patch(f'/api/category/{cid}/', {'name': 'SMOKE категория PATCH'},
+            content_type='application/json') if cid else None
+check('PATCH -> 200 и имя обновлено (description не тронут)',
+      r is not None and r.status_code == 200 and r.json().get('name') == 'SMOKE категория PATCH'
+      and r.json().get('description') == 'y', f'status={getattr(r, "status_code", None)}')
+
+r = c.delete(f'/api/category/{cid}/') if cid else None
+check('DELETE -> 204', r is not None and r.status_code == 204, f'status={getattr(r, "status_code", None)}')
+r = c.get(f'/api/category/{cid}/') if cid else None
+check('после DELETE: GET -> 404', r is not None and r.status_code == 404,
+      f'status={getattr(r, "status_code", None)}')
+
+# У дерева CRUD-действий нет: POST не биндится вовсе (405), а не падает (500)
+r = c.post('/api/node/', {'name': 'x'}, content_type='application/json')
+check('POST /api/node/ -> 405 (CRUD у дерева нет)', r.status_code == 405,
+      f'status={r.status_code}')
+
 # --- jqxTree: страница и разметка ---
 html = c.get('/tree/').content.decode()
 check('tree: страница содержит <jqx-tree', '<jqx-tree' in html)
@@ -224,6 +265,83 @@ check('tree config: pk/labelField/parentField/chunkSize',
       cfg.get('pk') == 'id' and cfg.get('labelField') == 'name'
       and cfg.get('parentField') == 'parent' and cfg.get('chunkSize') == 50,
       f"cfg={cfg}")
+
+# --- jqxForm: страница и разметка ---
+html = c.get('/form/').content.decode()
+check('form: страница содержит <jqx-form', '<jqx-form' in html)
+check('form: source=/api/category-form/ (дедуп префикса грида)',
+      'source="/api/category-form/"' in html)
+check('form: без id — record="" (новая запись)', 'record=""' in html)
+check('form: имеет ассеты (loader)', '__JQXWIDGETS_LOADED__' in html)
+check('form: есть кнопки demo getForm', 'getForm' in html and 'btn-form-new' in html)
+
+html = c.get('/form/?id=1').content.decode()
+check('form ?id=1: record="1"', 'record="1"' in html)
+
+# --- jqxForm: REST — конфигурация формы ---
+r = c.get('/api/category-form/config/')
+check('GET /api/category-form/config/', r.status_code == 200, f'status={r.status_code}')
+cfg = r.json()
+rows = cfg.get('template', [])
+binds = {row.get('bind'): row for row in rows}
+check('form config: поля name/description/priority',
+      set(binds) >= {'name', 'description', 'priority'}, f"binds={list(binds)}")
+check('form config: name required', binds.get('name', {}).get('required') is True)
+check('form config: priority — number', binds.get('priority', {}).get('type') == 'number',
+      f"row={binds.get('priority')}")
+check('form config: read-only id не в шаблоне', 'id' not in binds, f"binds={list(binds)}")
+check('form config: pk=id', cfg.get('pk') == 'id', f"pk={cfg.get('pk')}")
+
+# Дедуп префикса не сломал грид-источник той же модели
+r = c.get('/api/category/config/')
+check('грид-конфиг категории на старом URL цел',
+      r.status_code == 200 and r.json().get('columns'), f'status={r.status_code}')
+
+# --- jqxForm: REST — CRUD формы (ModelViewSet) ---
+r = c.post('/api/category-form/',
+           {'name': 'SMOKE форма', 'description': 'из формы', 'priority': 7},
+           content_type='application/json')
+check('POST /api/category-form/ -> 201', r.status_code == 201, f'status={r.status_code}')
+fcreated = r.json() if r.status_code == 201 else {}
+fid = fcreated.get('id')
+
+r = c.get(f'/api/category-form/{fid}/') if fid else None
+check('GET /api/category-form/<id>/ -> 200 и значение',
+      r is not None and r.status_code == 200 and r.json().get('name') == 'SMOKE форма',
+      f'status={getattr(r, "status_code", None)}')
+
+r = c.put(f'/api/category-form/{fid}/',
+          {'name': 'SMOKE форма PUT', 'description': 'после PUT', 'priority': 8},
+          content_type='application/json') if fid else None
+check('PUT формы -> 200 и имя обновлено',
+      r is not None and r.status_code == 200 and r.json().get('name') == 'SMOKE форма PUT',
+      f'status={getattr(r, "status_code", None)}')
+
+# Обязательное поле: PUT без name -> 400 (форма шлёт все поля, но защита есть)
+r = c.put(f'/api/category-form/{fid}/', {'description': 'без имени'},
+          content_type='application/json') if fid else None
+check('PUT без обязательного name -> 400',
+      r is not None and r.status_code == 400, f'status={getattr(r, "status_code", None)}')
+
+r = c.delete(f'/api/category-form/{fid}/') if fid else None
+check('DELETE формы -> 204', r is not None and r.status_code == 204,
+      f'status={getattr(r, "status_code", None)}')
+
+# --- jqxForm из Django-формы (Form(form=...)) ---
+html = c.get('/form-django/').content.decode()
+check('form-django: страница содержит <jqx-form', '<jqx-form' in html)
+check('form-django: source=/api/product-form/ (дедуп префикса грида)',
+      'source="/api/product-form/"' in html)
+for token in ['Название:', 'Цена:', 'Категория:', 'В наличии:',
+              'Например: «Война и мир»', 'in_stock', 'dropdownlist']:
+    check(f'form-django: config содержит {token!r}', token in html)
+
+html = c.get('/form-django/?id=1').content.decode()
+check('form-django ?id=1: record="1"', 'record="1"' in html)
+
+# источник формы товара зарегистрирован с суффиксом (грид держит /api/product/)
+r = c.get('/api/product-form/config/')
+check('GET /api/product-form/config/', r.status_code == 200, f'status={r.status_code}')
 
 print()
 if failures:

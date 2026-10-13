@@ -1,10 +1,7 @@
 """Виджет jqxGrid — рендерится в шаблоне как ``{{ my_grid }}``."""
 import json
 
-from django.template.loader import render_to_string
-
-from .assets import assets_html
-from .viewsets import source_url
+from .base import Widget
 
 
 class GridConfig:
@@ -57,7 +54,7 @@ class GridConfig:
         return json.dumps(self.as_dict(), ensure_ascii=False, default=str)
 
 
-class Grid:
+class Grid(Widget):
     """Виджет jqxGrid.
 
     Простой случай::
@@ -77,43 +74,33 @@ class Grid:
 
         my_grid = ProductGrid(source=GridViewSet.create("Product"))
     """
-    source = None
+    template_name = 'jqxwidgets/grid.html'
+
     columns: list | None = None
     columnsgroups: list | None = None
-    options: dict = {}
 
     def __init__(self, source=None, columns=None, columnsgroups=None,
                  config: GridConfig | dict | None = None, **options):
-        self.source = source if source is not None else type(self).source
+        # config разбирается до базового __init__: колонки/группы —
+        # kind-поля, они живут отдельно от опций jqx (см. GridConfig).
+        cfg = GridConfig.from_value(config)
+
         if columns is None:
             columns = type(self).columns
         if columnsgroups is None:
             columnsgroups = type(self).columnsgroups
+        if cfg.columns is not None:
+            columns = cfg.columns
+        if cfg.columnsgroups is not None:
+            columnsgroups = cfg.columnsgroups
 
-        merged_options = dict(type(self).options or {})
-        if config is not None:
-            cfg = GridConfig.from_value(config)
-            merged_options.update(cfg.options)
-            if cfg.columns is not None:
-                columns = cfg.columns
-            if cfg.columnsgroups is not None:
-                columnsgroups = cfg.columnsgroups
-        merged_options.update(options)
+        super().__init__(source=source, config=cfg.options, **options)
 
+        self.columns = columns
+        self.columnsgroups = columnsgroups
         self.config = GridConfig(columns=columns, columnsgroups=columnsgroups,
-                                 **merged_options)
+                                 **self.options)
 
-    @property
-    def url(self) -> str:
-        """URL источника данных (REST-списка) грида."""
-        return source_url(self.source)
-
-    def __html__(self) -> str:
-        return render_to_string('jqxwidgets/grid.html', {
-            'source': self.url,
-            'config': self.config.to_json(),
-            'assets': assets_html(),
-        })
-
-    def __str__(self) -> str:
-        return self.__html__()
+    def config_json(self) -> str:
+        """Конфигурация грида: опции + колонки + группы колонок."""
+        return self.config.to_json()

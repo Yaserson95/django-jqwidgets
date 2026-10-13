@@ -1,0 +1,21 @@
+{% extends 'examples/base.html' %}
+
+{% block title %}Django-форма — django-jqwidgets{% endblock %}
+
+{% block content %}
+<h2>jqxForm из Django-формы</h2>
+<p class="lead">
+	<code>Form(source=PRODUCT_FORM, form=ProductDjangoForm, id=request.GET.get('id'))</code>
+	— шаблон полей строится из Django-<code>ModelForm</code>: тип контрола из класса
+	поля, подпись из <code>verbose_name</code> (+ <code>label_suffix</code>), список
+	категорий из FK, подсказка из <code>help_text</code>.
+	<br>
+	<a href="?id=1">Открыть товар #1</a> ·
+	<a href="?id=3">… #3</a> ·
+	<a href="./">Новый товар</a>
+</p>
+
+<div class="card">
+	{{ form }}
+</div>
+{% endblock %}

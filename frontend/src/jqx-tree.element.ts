@@ -1,22 +1,13 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  EventEmitter,
-  OnDestroy,
-  Output,
-  ViewChild,
-  signal,
-} from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { jqxTreeComponent } from 'jqwidgets-ng/jqxtree';
 
-import { configUrl } from './jqx-grid-config';
 import {
   buildTreeOptions,
   escapeHtml,
   sanitizeId,
   type TreeDefinition,
 } from './jqx-tree-config';
+import { JqxWidgetElement } from './jqx-widget.base';
 
 /** Состояние подгрузки уровня одного узла. */
 interface LevelState {
@@ -63,6 +54,9 @@ const PLACEHOLDER_LABEL = '…';
  * jqxTree не умеет показывать стрелку раскрытия у узла без детей, поэтому
  * для веток с `haschildren: true` добавляется заглушка-узел «…», которая
  * заменяется реальными детьми сразу после загрузки.
+ *
+ * Общее с `<jqx-grid>` (CRUD по источнику, source/config, error, lifecycle) —
+ * в базовом классе `JqxWidgetElement`.
  */
 @Component({
   selector: 'jqx-tree',
@@ -95,11 +89,10 @@ const PLACEHOLDER_LABEL = '…';
     `,
   ],
 })
-export class JqxTreeElement implements AfterViewInit, OnDestroy {
-  @ViewChild('inner') inner?: jqxTreeComponent;
+export class JqxTreeElement extends JqxWidgetElement {
+  protected override readonly widgetName = 'tree';
 
   // События для потребителей элемента (CustomEvent на <jqx-tree>)
-  @Output() created = new EventEmitter<void>();
   @Output() expand = new EventEmitter<any>();
   @Output() collapse = new EventEmitter<any>();
   @Output() select = new EventEmitter<any>();
@@ -112,46 +105,19 @@ export class JqxTreeElement implements AfterViewInit, OnDestroy {
   /** Загружен очередной чанк: {parent, loaded, total}. */
   @Output() chunkloaded = new EventEmitter<{ parent: string | null; loaded: number; total: number }>();
 
-  readonly error = signal<string | null>(null);
-  private destroyed = false;
-  private source = '';
   private chunkSize = 50;
   private readonly states = new Map<string, LevelState>();
   private readonly originalIds = new Map<string, string>();
   private scrollbarHost: any = null;
   private readonly onScroll = (): void => this.checkPending();
 
-  constructor(private readonly hostRef: ElementRef<HTMLElement>) {}
-
-  ngAfterViewInit(): void {
-    this.wireEvents();
-    void this.init();
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed = true;
-    this.scrollbarHost?.off('valueChanged', this.onScroll);
-    this.scrollbarHost = null;
-  }
-
-  private async init(): Promise<void> {
+  protected override async init(): Promise<void> {
     const host = this.hostRef.nativeElement;
     this.source = host.getAttribute('source') ?? '';
     const overrides = this.parseConfig(host.getAttribute('config'));
 
-    let definition: TreeDefinition = {};
-    if (this.source) {
-      try {
-        const response = await fetch(configUrl(this.source), {
-          headers: { Accept: 'application/json' },
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        definition = await response.json();
-      } catch (err) {
-        // Без конфига дерево работает на дефолтах (chunkSize=50 и т.п.).
-        console.warn('[jqx-tree] конфигурация не загружена, используются дефолты:', err);
-      }
-    }
+    // Сбой загрузки конфига некритичен: дерево работает на дефолтах.
+    const definition: TreeDefinition = (await this.loadConfig()) ?? {};
 
     if (this.destroyed) return;
 
@@ -216,6 +182,19 @@ export class JqxTreeElement implements AfterViewInit, OnDestroy {
       this.refreshPositions();
       this.checkPending();
     }
+  }
+
+  /** После create/update/delete (и вручную) — перезагрузка дерева с корня. */
+  protected override reloadData(): void {
+    const tree: any = (this.inner as any)?.widgetObject;
+    if (!tree || this.destroyed) return;
+    tree.clear();
+    this.states.clear();
+    this.originalIds.clear();
+    this.states.set(ROOT_KEY, {
+      loaded: 0, total: null, loading: false, expanded: true, lastTop: null,
+    });
+    void this.loadChunk(ROOT_KEY, null, false);
   }
 
   /** Запись бэкенда -> элемент jqxTree (+ заглушка для ветки с haschildren). */
@@ -395,22 +374,7 @@ export class JqxTreeElement implements AfterViewInit, OnDestroy {
     return found?.element ?? null;
   }
 
-  // ------------------------------------------------------------------
-  // Общее
-  // ------------------------------------------------------------------
-
-  private parseConfig(raw: string | null): Record<string, any> {
-    if (!raw) return {};
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (err) {
-      console.error('[jqx-tree] невалидный JSON в атрибуте config:', err);
-      return {};
-    }
-  }
-
-  private wireEvents(): void {
+  protected override wireEvents(): void {
     const inner = this.inner;
     if (!inner) return;
     inner.onExpand?.subscribe((args: any) => {
@@ -430,7 +394,8 @@ export class JqxTreeElement implements AfterViewInit, OnDestroy {
     this.relay(inner.onDragEnd, this.dragend);
   }
 
-  private relay(source: EventEmitter<any> | undefined, target: EventEmitter<any>): void {
-    source?.subscribe((value) => target.emit(value));
+  protected override teardown(): void {
+    this.scrollbarHost?.off('valueChanged', this.onScroll);
+    this.scrollbarHost = null;
   }
 }
