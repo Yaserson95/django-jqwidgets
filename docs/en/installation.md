@@ -100,13 +100,14 @@ busting is required.
 from jqxwidgets import Grid, GridViewSet, Tree, TreeViewSet
 ```
 
-Render a page containing `{{ grid }}` or `{{ tree }}` (see
-[usage.md](usage.md)) and check the browser dev tools: one
+Render a page containing `{{ grid }}`, `{{ tree }}` or `{{ form }}` (see
+[usage/grid.md](usage/grid.md), [usage/tree.md](usage/tree.md),
+[usage/form.md](usage/form.md)) and check the browser dev tools: one
 `<link rel="stylesheet">` per stylesheet plus a small inline loader script that
 injects `polyfills-*.js` and `main-*.js` exactly once per page
 (`window.__JQXWIDGETS_LOADED__` guard).
 
-If the page shows `<jqx-grid>` / `<jqx-tree>` but nothing renders and the
+If the page shows `<jqx-grid>` / `<jqx-tree>` / `<jqx-form>` but nothing renders and the
 console warns about `manifest.json`, the static files are missing — reinstall
 the package or, in a source checkout, rebuild the frontend (below).
 
@@ -143,4 +144,7 @@ pip uninstall django-jqxwidgets
 Remove `'jqxwidgets'` from `INSTALLED_APPS`, the `include('jqxwidgets.urls')`
 path, and every `Grid(...)` / `Tree(...)` usage from your views/templates.
 
-Next: [usage.md](usage.md) — how to build grids · [classes.md](classes.md) — API reference.
+Next: [usage/grid.md](usage/grid.md) — how to build grids ·
+[classes/base.md](classes/base.md) — API reference.
+
+Русская версия: [../ru/installation.md](../ru/installation.md).

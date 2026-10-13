@@ -2,6 +2,8 @@
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
+> Русский: [README_ru.md](README_ru.md)
+
 Server-driven **jQWidgets** data grid, tree and record form for Django. The
 package ships two halves:
 
@@ -100,9 +102,8 @@ def products_page(request):
 </html>
 ```
 
-Full walkthrough, options and the request protocol:
-**[docs/installation.md](docs/installation.md)** · **[docs/usage.md](docs/usage.md)** ·
-**[docs/classes.md](docs/classes.md)** (API reference).
+Full walkthrough, options and the request protocol: see
+[Documentation](#documentation) below.
 
 ---
 
@@ -224,7 +225,8 @@ jqxwidgets/            # the installable Django app (the package on PyPI/GitHub)
   viewsets/            #   BaseViewSet + GridViewSet / TreeViewSet / FormViewSet
   ...
 frontend/              # Angular sources for the web components (npm run build)
-docs/                  # installation, usage and API reference
+docs/                  # installation + per-widget guides and API reference
+  en/ ru/              #   English and Russian versions of the documentation
 examples/              # demo Django app (models, views, pages, seed commands)
 config/                # demo project settings / urls
 pyproject.toml         # packaging (pip install git+...)
@@ -233,11 +235,31 @@ examples/tests/smoke.py# smoke test
 
 ## Documentation
 
-| File | Contents |
-| --- | --- |
-| [docs/installation.md](docs/installation.md) | install from GitHub, settings, static files, upgrading |
-| [docs/usage.md](docs/usage.md) | how to build grids: sources, columns, options, request protocol |
-| [docs/classes.md](docs/classes.md) | API reference: classes, methods, functions, constants |
+English · Русский ([README_ru.md](README_ru.md))
+
+### Getting started
+
+| English | Русский | Contents |
+| --- | --- | --- |
+| [docs/en/installation.md](docs/en/installation.md) | [docs/ru/installation.md](docs/ru/installation.md) | install from GitHub, settings, static files, upgrading |
+
+### Guides (usage)
+
+| English | Русский | Contents |
+| --- | --- | --- |
+| [docs/en/usage/base.md](docs/en/usage/base.md) | [docs/ru/usage/base.md](docs/ru/usage/base.md) | shared concepts: sources, option merge order, one bundle per page, package router |
+| [docs/en/usage/grid.md](docs/en/usage/grid.md) | [docs/ru/usage/grid.md](docs/ru/usage/grid.md) | grids: quick start, sources, columns, jqxGrid options, request protocol, recipes |
+| [docs/en/usage/tree.md](docs/en/usage/tree.md) | [docs/ru/usage/tree.md](docs/ru/usage/tree.md) | trees: lazy loading (roots, expand, scroll chunks), jqxTree options |
+| [docs/en/usage/form.md](docs/en/usage/form.md) | [docs/ru/usage/form.md](docs/ru/usage/form.md) | forms: CRUD, template from a Django `ModelForm`, `getForm()` |
+
+### API reference (classes)
+
+| English | Русский | Contents |
+| --- | --- | --- |
+| [docs/en/classes/base.md](docs/en/classes/base.md) | [docs/ru/classes/base.md](docs/ru/classes/base.md) | `Widget` base class, shared module functions, package exports, exceptions |
+| [docs/en/classes/grid.md](docs/en/classes/grid.md) | [docs/ru/classes/grid.md](docs/ru/classes/grid.md) | `Grid`, `GridConfig`, `GridViewSet`, `GridPagination`, `jqxwidgets.config` |
+| [docs/en/classes/tree.md](docs/en/classes/tree.md) | [docs/ru/classes/tree.md](docs/ru/classes/tree.md) | `Tree`, `TreeViewSet` |
+| [docs/en/classes/form.md](docs/en/classes/form.md) | [docs/ru/classes/form.md](docs/ru/classes/form.md) | `Form`, `FormViewSet`, `template_from_form` |
 
 ## License
 
